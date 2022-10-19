@@ -1,0 +1,166 @@
+
+-- looking at the data needed
+
+ SELECT *
+ FROM `utopian-datum-350022.covid_data.covid_deaths` 
+ WHERE continent IS NOT NULL
+ ORDER BY 3,4
+ 
+
+
+SELECT location,date, total_cases, new_cases, total_deaths, population
+
+ FROM `utopian-datum-350022.covid_data.covid_deaths` 
+ WHERE continent IS NOT NULL
+
+ ORDER BY 1,2
+ 
+--  looking at total cases vs total deaths
+-- shows the likelihood of contacting convid in Nigeria
+
+SELECT location,date, total_cases,total_deaths, (total_deaths/total_cases) * 100 AS perc_death
+
+ FROM `utopian-datum-350022.covid_data.covid_deaths` 
+
+ WHERE location LIKE '%Nigeria%' AND continent IS NOT NULL
+ ORDER BY 1,2
+ 
+
+-- looking at total cases vs population
+-- shows what percentage of Nigerian population got convid
+
+SELECT location,date, population, total_cases, (total_cases/population) * 100 AS perc_death
+
+ FROM `utopian-datum-350022.covid_data.covid_deaths` 
+
+WHERE location LIKE '%Nigeria%' AND continent IS NOT NULL
+ ORDER BY 1,2
+
+-- showing what percentage of the world got convid 
+  
+
+-- WHERE location LIKE '%Nigeria%'
+ SELECT location,date, population, total_cases, (total_cases/population) * 100 AS perc_population_infected
+
+ FROM `utopian-datum-350022.covid_data.covid_deaths`
+ WHERE continent IS NOT NULL
+ ORDER BY 4,5 
+
+--  looking at countries with the highest infection cases
+SELECT location, population, MAX(total_cases) AS Highest_infectionCount, MAX((total_cases/population)) * 100 AS perc_population_infected
+
+ FROM `utopian-datum-350022.covid_data.covid_deaths` 
+ WHERE continent IS NOT NULL
+-- WHERE location LIKE '%Nigeria%'
+GROUP BY location, population
+ ORDER BY perc_population_infected DESC
+
+
+--  Showing countries with highest death count
+SELECT location, MAX(total_deaths) AS total_death_count
+ FROM `utopian-datum-350022.covid_data.covid_deaths` 
+
+ WHERE continent IS NOT NULL
+
+-- WHERE location LIKE '%Nigeria%'
+GROUP BY location
+ ORDER BY total_death_count DESC
+
+-- NARROWING DOWN TO CONTINENTS
+-- showing the continent with the highest death count per population
+SELECT continent, MAX(total_deaths) AS total_death_count
+ FROM `utopian-datum-350022.covid_data.covid_deaths` 
+
+ WHERE continent IS NOT NULL
+
+-- WHERE location LIKE '%Nigeria%'
+GROUP BY continent
+ ORDER BY total_death_count DESC
+
+--  GLOBAL NUMBERS
+
+ SELECT  SUM(new_cases) AS total_cases, SUM(cast(new_deaths AS int)) AS total_deaths, SUM(new_deaths)/SUM(new_cases)*100 AS  perc_death
+ FROM `utopian-datum-350022.covid_data.covid_deaths` 
+
+WHERE continent IS NOT NULL
+-- GROUP BY  date
+ ORDER BY 1,2 DESC
+
+SELECT death.continent,death.location,death.date, death.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (partition by death.location) AS total_new_vac
+ FROM `utopian-datum-350022.covid_data.covid_deaths` AS death
+JOIN `utopian-datum-350022.covid_data.covid_vacination` AS vac
+ON death.location = vac.location
+AND death.date = vac.date
+WHERE death.continent IS  NOT NULL 
+ORDER BY 2,3
+
+SELECT death.continent,death.location,death.date, death.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (partition by death.location ORDER BY death.location,death.date) AS cummulative_people_vac
+ FROM `utopian-datum-350022.covid_data.covid_deaths` AS death
+JOIN `utopian-datum-350022.covid_data.covid_vacination` AS vac
+ON death.location = vac.location
+AND death.date = vac.date
+WHERE death.continent IS  NOT NULL 
+ORDER BY 2,3	
+  
+-- USING CTE (giving error)
+WITH PopvsVac  (Continent, Location,Date, Population,new_vaccinations,cummulative_people_vac)
+AS (
+SELECT death.continent,death.location,death.date, death.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (partition by death.location ORDER BY death.location,death.date ORDER BY death.location,death.date) AS cummulative_people_vac
+ FROM `utopian-datum-350022.covid_data.covid_deaths` AS death
+JOIN `utopian-datum-350022.covid_data.covid_vacination` AS vac
+ON death.location = vac.location
+AND death.date = vac.date
+WHERE death.continent IS  NOT NULL 
+-- ORDER BY 2,3
+)
+
+SELECT *, (cummulative_people_vac/population)*100
+FROM PopvsVac;
+
+
+-- USING TEMP TABLE
+DROP TABLE if exist #perc_population_vac
+CREATE TABLE #perc_population_vac
+(
+  Continent nvarchar(255), 
+  Location nvarchar(255),
+  Date datetime, 
+  Population numeric,
+  new_vaccinations numeric,
+  cummulative_people_vac numeric
+)
+INSERT INTO #perc_population_vac
+
+SELECT death.continent,death.location,death.date, death.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (partition by death.location ORDER BY death.location,death.date ORDER BY death.location,death.date) AS cummulative_people_vac
+ FROM `utopian-datum-350022.covid_data.covid_deaths` AS death
+JOIN `utopian-datum-350022.covid_data.covid_vacination` AS vac
+ON death.location = vac.location
+AND death.date = vac.date
+WHERE death.continent IS  NOT NULL 
+-- ORDER BY 2,3
+
+SELECT *, (cummulative_people_vac/population)*100
+FROM #perc_population_vac;
+
+
+CREATE VIEW #perc_population_vac AS
+SELECT death.continent,death.location,death.date, death.population, vac.new_vaccinations,
+SUM(vac.new_vaccinations) OVER (partition by death.location ORDER BY death.location,death.date ORDER BY death.location,death.date) AS cummulative_people_vac
+ FROM `utopian-datum-350022.covid_data.covid_deaths` AS death
+JOIN `utopian-datum-350022.covid_data.covid_vacination` AS vac
+ON death.location = vac.location
+AND death.date = vac.date
+WHERE death.continent IS  NOT NULL 
+ORDER BY 2,3
+
+
+CREATE VIEW #OPEN
+SELECT *
+FROM `utopian-datum-350022.covid_data.covid_vacination`
+
+
+ 
